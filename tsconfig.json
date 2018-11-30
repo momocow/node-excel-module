@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "outDir": "dist",
+    "declaration": true,
+    "target": "es6",
+    "module": "commonjs"
+  },
+  "include": [
+    "index.ts",
+    "lib"
+  ]
+}

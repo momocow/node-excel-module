@@ -1,0 +1,39 @@
+{
+  "name": "excel-module",
+  "version": "0.0.0",
+  "description": "Expose excel functions in a XLSX file as a JavaScript module.",
+  "main": "index.js",
+  "scripts": {
+    "commit": "gitmoji -c",
+    "lint": "tslint -p tsconfig.json -c tslint.json",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/momocow/node-excel-module.git"
+  },
+  "keywords": [
+    "excel",
+    "xlsx",
+    "spreadsheet",
+    "sheet",
+    "module",
+    "export",
+    "package",
+    "formula"
+  ],
+  "author": "MomoCow",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/momocow/node-excel-module/issues"
+  },
+  "homepage": "https://github.com/momocow/node-excel-module#readme",
+  "devDependencies": {
+    "@types/node": "^10.12.10",
+    "gitmoji-cli": "^1.9.2",
+    "tslint": "^5.11.0",
+    "tslint-config-standard": "^8.0.1",
+    "typescript": "^3.2.1"
+  }
+}
