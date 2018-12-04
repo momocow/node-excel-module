@@ -4,26 +4,40 @@ import {
   CellErrorValue,
   CellHyperlinkValue,
   CellRichTextValue,
-  CellFormulaValue
+  CellFormulaValue,
+  FormulaType,
+  CellSharedFormulaValue
 } from 'exceljs'
 
-const { Parser: FormulaParser } = require('hot-formula-parser')
-const formulaParser = new FormulaParser()
+import {
+  wrapFunc,
+  parseRange,
+  buildContext,
+  formatValue
+} from './utils'
+
+import {
+  parseCoord,
+  WorkbookCoord
+} from './coordinate'
+
+import { evalFormula } from './eval-formula'
+
+import { debug } from './debug'
 
 interface CompileOptions {
 }
+Number(1)
+type CellType = |
+  FunctionConstructor |
+  NumberConstructor |
+  StringConstructor |
+  BooleanConstructor
 
 interface CellSpec {
   cell: string
-  args?: Record<string, string>
-}
-
-type APIFunction = (...args: any[]) => boolean | number | string
-type APIExport = null | boolean | number | string | APIFunction
-
-interface WorkbookCoordinate {
-  sheet: string | number,
-  label: string
+  type: CellType
+  args?: string[]
 }
 
 class UnrecognizedCellError extends Error {
@@ -41,75 +55,106 @@ class EmptyWorkbookError extends Error {
 }
 
 export default class Workbook extends WorkbookBase {
-  private buildFormulaAST (formula: string) {
-    formulaParser.parse(formula)
-  }
-
   public compile<T extends Record<string, CellSpec>> (
     spec: T,
     options?: CompileOptions
-  ): Record<keyof T, APIExport> {
+  ): {
+    [K in keyof T]: ReturnType<T[K]['type']>
+  } {
     if (this.worksheets.length === 0) throw new EmptyWorkbookError()
+
+    debug('# Spec %o', spec)
+
+    /**
+     * MUST be serializable
+     */
+    const context: Record<string, any> = buildContext(
+      Object.values(spec).map(c => c.cell),
+      (label: string) => {
+        const coord = parseCoord(label) as Pick<WorkbookCoord, 'sheet' | 'label'>
+        if (!coord) throw new UnrecognizedCellError(label)
+
+        debug('## Label[%s]: %o', label, coord)
+
+        const worksheet = this.getWorksheet(coord.sheet)
+        let curCell = worksheet.getCell(coord.label)
+
+        // Ensure the cell to be the master
+        if (curCell.type === ValueType.Merge) {
+          debug('##   Use master cell')
+          curCell = curCell.master
+        }
+
+        debug('##   = %o', curCell.value)
+
+        switch (curCell.type) {
+          // primitive values
+          case ValueType.Date:
+          case ValueType.Boolean:
+          case ValueType.Null:
+          case ValueType.Number:
+          case ValueType.String:
+            return curCell.value
+          // text values
+          case ValueType.Hyperlink:
+            return (curCell.value as CellHyperlinkValue).text
+          case ValueType.RichText:
+            return (curCell.value as CellRichTextValue).richText
+              .map(t => t.text)
+              .join('')
+          // @TODO
+          // SharedString is not documented (https://github.com/guyonroche/exceljs#value-types)
+          // Leave it unimplemented until any reproducible scenarios
+          // case ValueType.SharedString:
+          case ValueType.Error:
+            return (curCell.value as CellErrorValue).error
+          case ValueType.Formula:
+            if (curCell.formulaType === FormulaType.Shared) {
+              curCell = worksheet.getCell((curCell.value as CellSharedFormulaValue).sharedFormula)
+            }
+            return '=' + (curCell.value as CellFormulaValue).formula
+        }
+      }
+    )
+    debug('# Context %o', context)
 
     const exports: Record<string, any> = {}
 
-    for (let fn of Object.keys(spec)) {
-      const { cell, args } = spec[fn]
-      const coord = Workbook.parseCoord(cell)
+    for (let key of Object.keys(spec)) {
+      debug('## Exporting member[%s]', key)
 
-      if (!coord) throw new UnrecognizedCellError(cell)
+      let cellType: CellType = spec[key].type ? spec[key].type
+        : spec[key].args ? Function
+          : String
+      let cell: string = spec[key].cell
 
-      const worksheet = this.getWorksheet(coord.sheet)
-      let curCell = worksheet.getCell(coord.label)
+      debug('### Exported as a %s', cellType.name)
+      debug('### Cell[%s]', cell)
+      debug('###   = %o', context[cell])
 
-      // Ensure the cell to be the master
-      if (curCell.type === ValueType.Merge) {
-        curCell = curCell.master
-      }
-
-      switch (curCell.type) {
-        // primitive values
-        case ValueType.Date:
-        case ValueType.Boolean:
-        case ValueType.Null:
-        case ValueType.Number:
-        case ValueType.String:
-          exports[fn] = exports[coord.label] = curCell.value
-          break
-        // text values
-        case ValueType.Hyperlink:
-          exports[fn] = exports[coord.label] = (curCell.value as CellHyperlinkValue).text
-          break
-        case ValueType.RichText:
-          exports[fn] = exports[coord.label] = (curCell.value as CellRichTextValue).richText.map(tok => tok.text).join('')
-          break
-        // @TODO
-        // SharedString is not documented (https://github.com/guyonroche/exceljs#value-types)
-        // Leave it unimplemented until any reproducible scenarios
-        // case ValueType.SharedString:
-        case ValueType.Error:
-          exports[fn] = (curCell.value as CellErrorValue).error
-          break
-        case ValueType.Formula:
-          this.buildFormulaAST((curCell.value as CellFormulaValue).formula)
+      if (cellType === Function) {
+        exports[key] = typeof context[cell] === 'string' && context[cell].startsWith('=')
+          ? wrapFunc(evalFormula, {
+            entry: cell,
+            ...context,
+            parseRange,
+            args: spec[key].args
+          })
+        : wrapFunc(function () {
+          return context.value
+        }, {
+          value: context[cell]
+        })
+      } else {
+        exports[key] = exports[cell] = formatValue(
+          context[cell], (cellType as Exclude<CellType, FunctionConstructor>))
       }
     }
 
-    return Object.keys(spec).reduce((acc, k) => {
-      acc[k] = () => ''
-      return acc
-    }, {} as Record<keyof T, APIExport>)
-  }
+    debug('# Exports %o', exports)
 
-  static parseCoord (str: string): WorkbookCoordinate | null {
-    let matched = str.match(/(?:([\s\w-_]+)!)?([A-Z]+)([1-9]+[0-9]*)/)
-    if (matched) {
-      return {
-        sheet: matched[1] || 1,
-        label: matched[2]
-      }
+    return exports as {
+      [K in keyof T]: ReturnType<T[K]['type']>
     }
-
-    return null
   }
 }
