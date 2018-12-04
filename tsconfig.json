@@ -4,9 +4,10 @@
     "baseUrl": ".",
     "outDir": "dist",
     "declaration": true,
-    "target": "es6",
+    "target": "es2018",
     "module": "commonjs",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true
   },
   "include": [
     "index.ts",

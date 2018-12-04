@@ -6,7 +6,9 @@
   "scripts": {
     "commit": "gitmoji -c",
     "lint": "tslint -p tsconfig.json -c tslint.json",
-    "build": "tsc",
+    "build": "npm run clean && tsc",
+    "clean": "rm -rf ./dist",
+    "test:hot": "npm run build && npm run test",
     "test": "ava ./test/**/*.test.js"
   },
   "repository": {
@@ -30,7 +32,9 @@
   },
   "homepage": "https://github.com/momocow/node-excel-module#readme",
   "devDependencies": {
+    "@types/debug": "0.0.31",
     "@types/node": "^10.12.10",
+    "@types/serialize-javascript": "^1.5.0",
     "ava": "^1.0.0-rc.2",
     "gitmoji-cli": "^1.9.2",
     "tslint": "^5.11.0",
@@ -38,8 +42,11 @@
     "typescript": "^3.2.1"
   },
   "dependencies": {
+    "base26": "github:jameslaneconkling/base26",
+    "debug": "^4.1.0",
     "exceljs": "^1.6.3",
-    "hot-formula-parser": "^3.0.0"
+    "hot-formula-parser": "^3.0.0",
+    "serialize-javascript": "^1.5.0"
   },
   "ava": {
     "babel": false,
