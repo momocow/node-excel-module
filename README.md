@@ -81,6 +81,7 @@ When specifying cells, use excel syntax like `A1`, `$B$2`. **Note** that both ar
 
 ## Example
 - `a.xlsx`
+
   | Row\Col | `A` | `B` | `C`         |
   | ------- | --- | --- | ----------- |
   | `1`     | 1   | 2   | =SUM(A1:A2) |
