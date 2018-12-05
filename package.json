@@ -8,8 +8,8 @@
     "lint": "tslint -p tsconfig.json -c tslint.json",
     "build": "npm run clean && tsc",
     "clean": "rm -rf ./dist",
-    "test:hot": "npm run build && npm run test",
-    "test": "ava ./test/**/*.test.js"
+    "test:quick": "test -d ./dist && ava ./test/**/*.test.js",
+    "test": "npm run build && ava ./test/**/*.test.js"
   },
   "repository": {
     "type": "git",
