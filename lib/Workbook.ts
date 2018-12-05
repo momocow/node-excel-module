@@ -13,12 +13,12 @@ import {
   wrapFunc,
   parseRange,
   buildContext,
-  formatValue
+  formatValue,
+  resolveSharedFormula
 } from './utils'
 
 import {
-  parseCoord,
-  WorkbookCoord
+  Coordinate
 } from './coordinate'
 
 import { evalFormula } from './eval-formula'
@@ -38,13 +38,6 @@ interface CellSpec {
   cell: string
   type: CellType
   args?: string[]
-}
-
-class UnrecognizedCellError extends Error {
-  constructor (cell: string) {
-    super(`Unrecognized cell: "${cell}".`)
-    this.name = 'UnrecognizedCellError'
-  }
 }
 
 class EmptyWorkbookError extends Error {
@@ -71,18 +64,19 @@ export default class Workbook extends WorkbookBase {
     const context: Record<string, any> = buildContext(
       Object.values(spec).map(c => c.cell),
       (label: string) => {
-        const coord = parseCoord(label) as Pick<WorkbookCoord, 'sheet' | 'label'>
-        if (!coord) throw new UnrecognizedCellError(label)
+        let coord = new Coordinate(label)
 
-        debug('## Label[%s]: %o', label, coord)
+        debug('## Label[%s]: %o', label, coord.toJSON())
 
         const worksheet = this.getWorksheet(coord.sheet)
         let curCell = worksheet.getCell(coord.label)
+        coord = new Coordinate(curCell.$col$row)
 
         // Ensure the cell to be the master
         if (curCell.type === ValueType.Merge) {
           debug('##   Use master cell')
           curCell = curCell.master
+          coord = new Coordinate(curCell.$col$row)
         }
 
         debug('##   = %o', curCell.value)
@@ -111,6 +105,11 @@ export default class Workbook extends WorkbookBase {
           case ValueType.Formula:
             if (curCell.formulaType === FormulaType.Shared) {
               curCell = worksheet.getCell((curCell.value as CellSharedFormulaValue).sharedFormula)
+              return '=' + resolveSharedFormula(
+                (curCell.value as CellFormulaValue).formula,
+                new Coordinate(curCell.$col$row),
+                coord
+              )
             }
             return '=' + (curCell.value as CellFormulaValue).formula
         }
@@ -139,7 +138,7 @@ export default class Workbook extends WorkbookBase {
             ...context,
             parseRange,
             args: spec[key].args
-          })
+          }, 'localContext')
         : wrapFunc(function () {
           return context.value
         }, {

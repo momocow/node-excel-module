@@ -1,22 +1,26 @@
 import * as serialize from 'serialize-javascript'
 
 import { debug } from './debug'
-import { WorkbookCoord } from './coordinate'
+import {
+  CoordRelation,
+  Coordinate
+} from './coordinate'
 
 const { Parser: FormulaParser } = require('hot-formula-parser')
 
 export function wrapFunc (
   body: Function,
-  context: Record<string, any> = {}
+  context: Record<string, any> = {},
+  contextKey: string = 'context'
 ): Function {
   return Function(`
-    const context = ${serialize(context)};
-    return (${body.toString()})(context, ...Array.from(arguments));
+    const ${contextKey} = ${serialize(context)};
+    return (${body.toString()})(${contextKey}, ...Array.from(arguments));
     `
   )
 }
 
-export function parseRange (start: WorkbookCoord, end: WorkbookCoord) {
+export function parseRange (start: Coordinate, end: Coordinate) {
   const ret: string[] = []
   for (let y = start.row.index; y <= end.row.index; y++) {
     for (
@@ -51,11 +55,11 @@ export function buildContext (
     if (typeof context[cell] === 'string' && context[cell].startsWith('=')) {
       const materials: string[] = []
       // @TODO Cross sheets references have not been supported yet
-      formulaParser.on('callCellValue', function ({ label }: WorkbookCoord) {
+      formulaParser.on('callCellValue', function ({ label }: Coordinate) {
         debug('buildContext(): event "callCellValue" [label=%o]', label)
         materials.push(label)
       })
-      formulaParser.on('callRangeValue', function (start: WorkbookCoord, end: WorkbookCoord) {
+      formulaParser.on('callRangeValue', function (start: Coordinate, end: Coordinate) {
         debug('buildContext(): event "callRangeValue" [start=%o, end=%o]', start.label, end.label)
         materials.push(...parseRange(start, end))
       })
@@ -90,4 +94,46 @@ export function formatValue (
     default:
       throw new Error(`Unknown type, "${type.name}".`)
   }
+}
+
+export function resolveSharedFormula (formula: string, from: Coordinate, to: Coordinate) {
+  debug('resolveSharedFormula(): formula = %s', formula)
+  debug('resolveSharedFormula(): from = %s', from.label)
+  debug('resolveSharedFormula(): to = %s', to.label)
+
+  let lastIndex = 0
+  let ret = ''
+
+  function replaceLabel (label: string) {
+    debug('replaceLabel(): label = "%s"', label)
+    const relCoord = new CoordRelation(new Coordinate(label), from)
+    const labelIndex = formula.indexOf(label)
+    debug('replaceLabel(): label index = %d', labelIndex)
+    if (labelIndex >= 0) {
+      ret += formula.substring(lastIndex, labelIndex) + relCoord.resolveFrom(to).label
+      lastIndex = labelIndex + label.length
+    }
+  }
+
+  const formulaParser = new FormulaParser()
+  formulaParser.on('callCellValue', function ({ label }: Coordinate) {
+    try {
+      replaceLabel(label)
+    } catch (e) {
+      console.error(e)
+    }
+  })
+  formulaParser.on('callRangeValue', function (start: Coordinate, end: Coordinate) {
+    replaceLabel(start.label)
+    replaceLabel(end.label)
+  })
+  formulaParser.parse(formula)
+
+  if (lastIndex < formula.length) {
+    ret += formula.substr(lastIndex)
+  }
+
+  debug('resolveSharedFormula(): resolved = %s', ret)
+
+  return ret
 }
