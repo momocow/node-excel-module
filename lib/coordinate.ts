@@ -73,7 +73,6 @@ export class Coordinate {
       let matched = arg1.match(/(?:(\d+)!)?(\$?[A-Z]+)(\$?\d+)/)
       if (!matched) throw new InvalidCoordError(arg1)
 
-      this.label = arg1
       this.sheet = Number(matched[1] || 1)
       this.column = new Column(matched[2])
       this.row = new Row(matched[3])
@@ -81,8 +80,8 @@ export class Coordinate {
       this.column = arg1
       this.row = row as Row
       this.sheet = sheet
-      this.label = this.column.toString() + this.row.toString()
     }
+    this.label = this.column.toString() + this.row.toString()
   }
 
   shift (deltaCol: number = 0, deltaRow: number = 0): Coordinate {
