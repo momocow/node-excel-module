@@ -59,7 +59,7 @@ export async function buildContext (
 
   for (let cell of entries) {
     await new Promise(function (resolve, reject) {
-      lookUp(cell, (sheet, label, value) => {
+      lookUp(cell, async (sheet, label, value) => {
         label = toAbsCoord(label)
 
         debug('lookUp(): %o', { sheet, label, value })
@@ -96,7 +96,7 @@ export async function buildContext (
 
             debug('buildContext(): related cells = %o', materials)
             if (materials.length > 0) {
-              _merge(context, buildContext(materials, lookUp, context))
+              _merge(context, await buildContext(materials, lookUp, context))
               debug('buildContext(): new context = %o', context)
             }
           }
