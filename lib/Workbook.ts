@@ -9,10 +9,11 @@ import {
   CellSharedFormulaValue
 } from 'exceljs'
 
+import { buildContext } from './ContextBuilder'
+
 import {
   wrapFunc,
   parseRange,
-  buildContext,
   formatValue,
   resolveSharedFormula,
   toAbsCoord
