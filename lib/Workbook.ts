@@ -14,7 +14,8 @@ import {
   parseRange,
   buildContext,
   formatValue,
-  resolveSharedFormula
+  resolveSharedFormula,
+  toAbsCoord
 } from './utils'
 
 import {
@@ -26,8 +27,9 @@ import { evalFormula } from './eval-formula'
 import { debug } from './debug'
 
 interface CompileOptions {
+  exposeCells?: boolean
 }
-Number(1)
+
 type CellType = |
   FunctionConstructor |
   NumberConstructor |
@@ -48,12 +50,12 @@ class EmptyWorkbookError extends Error {
 }
 
 export default class Workbook extends WorkbookBase {
-  public compile<T extends Record<string, CellSpec>> (
+  public async compile<T extends Record<string, CellSpec>> (
     spec: T,
-    options?: CompileOptions
-  ): {
+    options: CompileOptions = {}
+  ): Promise<{
     [K in keyof T]: ReturnType<T[K]['type']>
-  } {
+  }> {
     if (this.worksheets.length === 0) throw new EmptyWorkbookError()
 
     debug('# Spec %o', spec)
@@ -61,22 +63,22 @@ export default class Workbook extends WorkbookBase {
     /**
      * MUST be serializable
      */
-    const context: Record<string, any> = buildContext(
+    const context: Record<string, any> = await buildContext(
       Object.values(spec).map(c => c.cell),
-      (label: string) => {
+      (label: string, done: (sheet: number, label: string, value: any) => void) => {
         let coord = new Coordinate(label)
-
         debug('## Label[%s]: %o', label, coord.toJSON())
 
         const worksheet = this.getWorksheet(coord.sheet)
         let curCell = worksheet.getCell(coord.label)
+
+        // fix coordinate to be absolute
         coord = new Coordinate(curCell.$col$row)
 
         // Ensure the cell to be the master
         if (curCell.type === ValueType.Merge) {
           debug('##   Use master cell')
           curCell = curCell.master
-          coord = new Coordinate(curCell.$col$row)
         }
 
         debug('##   = %o', curCell.value)
@@ -88,30 +90,38 @@ export default class Workbook extends WorkbookBase {
           case ValueType.Null:
           case ValueType.Number:
           case ValueType.String:
-            return curCell.value
+            return done(coord.sheet, coord.label, curCell.value)
           // text values
           case ValueType.Hyperlink:
-            return (curCell.value as CellHyperlinkValue).text
+            return done(coord.sheet, coord.label, (curCell.value as CellHyperlinkValue).text)
           case ValueType.RichText:
-            return (curCell.value as CellRichTextValue).richText
-              .map(t => t.text)
-              .join('')
+            return done(
+              coord.sheet,
+              coord.label,
+              (curCell.value as CellRichTextValue).richText
+                .map(t => t.text)
+                .join('')
+            )
           // @TODO
           // SharedString is not documented (https://github.com/guyonroche/exceljs#value-types)
           // Leave it unimplemented until any reproducible scenarios
           // case ValueType.SharedString:
           case ValueType.Error:
-            return (curCell.value as CellErrorValue).error
+            return done(coord.sheet, coord.label, (curCell.value as CellErrorValue).error)
           case ValueType.Formula:
             if (curCell.formulaType === FormulaType.Shared) {
               curCell = worksheet.getCell((curCell.value as CellSharedFormulaValue).sharedFormula)
-              return '=' + resolveSharedFormula(
-                (curCell.value as CellFormulaValue).formula,
-                new Coordinate(curCell.$col$row),
-                coord
+              return done(
+                coord.sheet,
+                coord.label,
+                '=' + resolveSharedFormula(
+                  (curCell.value as CellFormulaValue).formula,
+                  new Coordinate(curCell.$col$row),
+                  coord
+                )
               )
             }
-            return '=' + (curCell.value as CellFormulaValue).formula
+            return done(coord.sheet, coord.label, '=' + (curCell.value as CellFormulaValue).formula)
         }
       }
     )
@@ -125,16 +135,18 @@ export default class Workbook extends WorkbookBase {
       let cellType: CellType = spec[key].type ? spec[key].type
         : spec[key].args ? Function
           : String
-      let cell: string = spec[key].cell
+      let cell: Coordinate = new Coordinate(toAbsCoord(spec[key].cell))
 
       debug('### Exported as a %s', cellType.name)
-      debug('### Cell[%s]', cell)
-      debug('###   = %o', context[cell])
+      debug('### Cell[%s]', cell.toString())
+
+      const cellValue = context[cell.sheet][cell.label]
+      debug('###   = %o', cellValue)
 
       if (cellType === Function) {
-        exports[key] = typeof context[cell] === 'string' && context[cell].startsWith('=')
+        exports[key] = typeof cellValue === 'string' && cellValue.startsWith('=')
           ? wrapFunc(evalFormula, {
-            entry: cell,
+            entry: cell.toString().replace('!', '.'),
             ...context,
             parseRange,
             args: spec[key].args
@@ -142,11 +154,18 @@ export default class Workbook extends WorkbookBase {
         : wrapFunc(function () {
           return context.value
         }, {
-          value: context[cell]
+          value: cellValue
         })
+
+        if (options.exposeCells) {
+          exports[cell.toString()] = exports[key]
+        }
       } else {
-        exports[key] = exports[cell] = formatValue(
-          context[cell], (cellType as Exclude<CellType, FunctionConstructor>))
+        exports[key] = formatValue(
+          cellValue, (cellType as Exclude<CellType, FunctionConstructor>))
+        if (options.exposeCells) {
+          exports[cell.toString()] = exports[key]
+        }
       }
     }
 

@@ -14,7 +14,7 @@ test('sum.xlsx', async t => {
   t.plan(9)
 
   const workbook = await excelModule.from(SUM_XLSX)
-  const api = workbook.compile({
+  const api = await workbook.compile({
     data1: {
       type: Number,
       cell: 'A1'

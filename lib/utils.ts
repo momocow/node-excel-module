@@ -1,4 +1,5 @@
 import * as serialize from 'serialize-javascript'
+import _merge = require('lodash/merge')
 
 import { debug } from './debug'
 import {
@@ -35,44 +36,78 @@ export function parseRange (start: Coordinate, end: Coordinate) {
   return ret
 }
 
+/**
+ * @param label "A3" "A$3" "$A3" "$A$3" => "$A$3"
+ */
+export function toAbsCoord (label: string): string {
+  return label.replace(/\$?([A-Z]+)\$?(\d+)/, '$$$1$$$2')
+}
+
 export function offsetByCharCode (char: string, offset: number): string {
   return String.fromCharCode(char.charCodeAt(0) + offset)
 }
 
-export function buildContext (
+export async function buildContext (
   entries: string[],
-  lookUp: (label: string) => any,
+  lookUp: (label: string, done: (sheet: number, label: string, value: any) => void) => any,
   context: Record<string, any> = {}
-): Record<string, any> {
+): Promise<Record<string, any>> {
   debug('buildContext(): entry point = %o', entries)
   debug('buildContext(): context = %o', context)
 
   const formulaParser = new FormulaParser()
 
   for (let cell of entries) {
-    context[cell] = lookUp(cell)
+    await new Promise(function (resolve, reject) {
+      lookUp(cell, (sheet, label, value) => {
+        label = toAbsCoord(label)
 
-    if (typeof context[cell] === 'string' && context[cell].startsWith('=')) {
-      const materials: string[] = []
-      // @TODO Cross sheets references have not been supported yet
-      formulaParser.on('callCellValue', function ({ label }: Coordinate) {
-        debug('buildContext(): event "callCellValue" [label=%o]', label)
-        materials.push(label)
-      })
-      formulaParser.on('callRangeValue', function (start: Coordinate, end: Coordinate) {
-        debug('buildContext(): event "callRangeValue" [start=%o, end=%o]', start.label, end.label)
-        materials.push(...parseRange(start, end))
-      })
-      formulaParser.parse(context[cell].slice(1))
-      formulaParser.off('callCellValue')
-      formulaParser.off('callRangeValue')
+        debug('lookUp(): %o', { sheet, label, value })
 
-      debug('buildContext(): related cells = %o', materials)
-      if (materials.length > 0) {
-        Object.assign(context, buildContext(materials, lookUp, context))
-        debug('buildContext(): new context = %o', context)
-      }
-    }
+        try {
+          _merge(context, {
+            [sheet]: {
+              [label]: value
+            }
+          })
+
+          if (typeof value === 'string' && value.startsWith('=')) {
+            const materials: string[] = []
+            // @TODO Cross sheets references have not been supported yet
+            formulaParser.on('callCellValue', function ({ label }: Coordinate) {
+              try {
+                debug('buildContext(): event "callCellValue" [label=%o]', label)
+                materials.push(label)
+              } catch (e) {
+                return reject(e)
+              }
+            })
+            formulaParser.on('callRangeValue', function (start: Coordinate, end: Coordinate) {
+              try {
+                debug('buildContext(): event "callRangeValue" [start=%o, end=%o]', start.label, end.label)
+                materials.push(...parseRange(start, end))
+              } catch (e) {
+                return reject(e)
+              }
+            })
+            formulaParser.parse(value.slice(1))
+            formulaParser.off('callCellValue')
+            formulaParser.off('callRangeValue')
+
+            debug('buildContext(): related cells = %o', materials)
+            if (materials.length > 0) {
+              _merge(context, buildContext(materials, lookUp, context))
+              debug('buildContext(): new context = %o', context)
+            }
+          }
+        } catch (err) {
+          return reject(err)
+        }
+
+        resolve()
+      })
+    })
+
   }
 
   return context

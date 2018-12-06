@@ -110,6 +110,10 @@ export class Coordinate {
       sheet: this.sheet
     }
   }
+
+  toString () {
+    return this.sheet + '!' + this.label
+  }
 }
 
 export class CoordRelation {
