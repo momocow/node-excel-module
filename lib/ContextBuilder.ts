@@ -11,6 +11,41 @@ import {
 
 const { Parser: FormulaParser } = require('hot-formula-parser')
 
+export class BuilderNotInitializedError extends Error {
+  constructor () {
+    super(`The context builder has not been completely initialized yet.`)
+    this.name = 'BuilderNotInitializedError'
+  }
+}
+
+export class ContextBuilder {
+  public readonly context: Record<string, Record<string, any>> = {}
+
+  private sheet: number = 1
+
+  public isInitialized (): boolean {
+    return true
+  }
+
+  /**
+   * Change sheet
+   */
+  private chsheet (sheet: number) {
+    this.sheet = Math.max(1, sheet)
+  }
+
+  private setContext (coord: Coordinate, value: any) {
+    if (!this.context[coord.sheet]) this.context[coord.sheet] = {}
+    this.context[coord.sheet][coord.label] = value
+  }
+
+  public async build (entries: string[]): Promise<Record<string, any>> {
+    if (!this.isInitialized()) throw new BuilderNotInitializedError()
+
+    return this.context
+  }
+}
+
 export async function buildContext (
   entries: string[],
   lookUp: (label: string, done: (sheet: number, label: string, value: any) => void) => any,
