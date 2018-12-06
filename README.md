@@ -18,6 +18,7 @@ Expose excel functions in a XLSX file as a JavaScript module.
       - [CellSpec](#cellspec)
   - [Example](#example)
     - [More examples](#more-examples)
+  - [License](#license)
 
 ## Introduction
 - XLSX files are read and parsed by [Exceljs](https://github.com/guyonroche/exceljs).
@@ -125,3 +126,6 @@ assert(excelAPI.C1 === '=SUM(A1:A2)')
 ```
 ### More examples
 You can see [integration tests](https://github.com/momocow/node-excel-module/blob/master/test/integration/excel-module.test.js#L10) for more examples.
+
+## License
+[GLWTPL](LICENSE) base on https://github.com/me-shaon/GLWTPL.
