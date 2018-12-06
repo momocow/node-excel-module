@@ -1,6 +1,17 @@
 {
   "plugins": [
-    "semantic-release-gitmoji",
+    [
+      "semantic-release-gitmoji",
+      {
+        "releaseRules": {
+          "patch": {
+            "include": [
+              ":page_facing_up:"
+            ]
+          }
+        }
+      }
+    ],
     "@semantic-release/github",
     "@semantic-release/npm",
     [
