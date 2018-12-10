@@ -36,7 +36,6 @@
     "@semantic-release/git": "^7.0.5",
     "@semantic-release/github": "^5.2.5",
     "@types/debug": "0.0.31",
-    "@types/lodash": "^4.14.119",
     "@types/node": "^10.12.10",
     "@types/serialize-javascript": "^1.5.0",
     "ava": "^1.0.0-rc.2",
@@ -51,12 +50,15 @@
     "base26": "github:jameslaneconkling/base26",
     "debug": "^4.1.0",
     "exceljs": "^1.6.3",
-    "hot-formula-parser": "^3.0.0",
-    "lodash": "^4.17.11",
+    "hot-formula-parser": "file:vendor/formula-parser",
     "serialize-javascript": "^1.5.0"
   },
   "ava": {
     "babel": false,
     "compileEnhancements": false
-  }
+  },
+  "files": [
+    "dist",
+    "vendor"
+  ]
 }

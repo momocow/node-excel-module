@@ -1,0 +1,24 @@
+{
+  "name": "hot-formula-parser",
+  "version": "3.0.0-cross-sheet-supported.1",
+  "description": "Formula parser",
+  "main": "formula-parser.min.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/handsontable/formula-parser.git"
+  },
+  "keywords": [
+    "formula",
+    "formulas",
+    "parser",
+    "formula-parser",
+    "excel",
+    "spreadsheet"
+  ],
+  "author": "Handsoncode <hello@handsontable.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/handsontable/formula-parser/issues"
+  },
+  "homepage": "https://github.com/handsontable/formula-parser"
+}
