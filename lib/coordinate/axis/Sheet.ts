@@ -5,12 +5,10 @@ import ValueError from '../../errors/ValueError'
 export default class Sheet extends Axis {
   public readonly index: Index
 
-  constructor (index: number) {
-    if (Number.isNaN(index)) throw new ValueError(`The index should not be NaN.`)
-
+  constructor (index: Index) {
     super()
 
-    this.index = new Index(index, 0)
+    this.index = index
   }
 
   get label () {
@@ -22,6 +20,8 @@ export default class Sheet extends Axis {
   }
 
   static from (label: string): Sheet {
-    return new Sheet(Number(label.replace(/!$/, '')))
+    const index = Number(label.replace(/!$/, ''))
+    if (Number.isNaN(index)) throw new ValueError(`The index should not be NaN.`)
+    return new Sheet(new Index(index, 1))
   }
 }

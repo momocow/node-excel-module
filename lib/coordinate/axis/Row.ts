@@ -5,11 +5,9 @@ import ValueError from '../../errors/ValueError'
 export default class Row extends Axis {
   public readonly index: Index
 
-  constructor (index: number) {
-    if (Number.isNaN(index)) throw new ValueError(`The index should not be NaN.`)
-
+  constructor (index: Index) {
     super()
-    this.index = new Index(index, 0)
+    this.index = index
   }
 
   get label () {
@@ -17,9 +15,9 @@ export default class Row extends Axis {
   }
 
   static from (label: string): Row {
-    const abs = label.startsWith('$')
     const index = Number(label.replace(/^\$/, ''))
+    if (Number.isNaN(index)) throw new ValueError(`The index should not be NaN.`)
     // index is 1-based index
-    return new Row(index - 1)
+    return new Row(new Index(index, 1))
   }
 }

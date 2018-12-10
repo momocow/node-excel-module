@@ -10,9 +10,7 @@ import buildContext from './build-context'
 
 import {
   wrapFunc,
-  formatValue,
-  mapSheetName2Index,
-  ensureSheetNumber
+  formatValue
 } from './utils'
 
 import { evalFormula } from './sandbox/eval-formula'
@@ -45,7 +43,14 @@ class EmptyWorkbookError extends Error {
 }
 
 export default class Workbook extends WorkbookBase {
-  private normalizeLabel (label: string): string {
+  private normalizeCoords (label: string): string {
+    return label.replace(
+      /(?:(.+?)!)?\$?([a-zA-Z]+)\$?(\d+)(?::\$?([a-zA-Z]+)\$?(\d+))?/g,
+      (label, sheet, col1, row1, col2, row2) => {
+        
+      }
+    )
+    
     const sheetEnsured = ensureSheetNumber(
       mapSheetName2Index(label, (sheet) => this.getWorksheet(sheet).id)
     )

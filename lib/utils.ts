@@ -29,17 +29,3 @@ export function formatValue (
       throw new Error(`Unknown type, "${type.name}".`)
   }
 }
-
-export function mapSheetName2Index (
-  label: string,
-  lookUp: (sheet: string) => number
-): string {
-  return label.replace(/^.*?!/, function (matched) {
-    return lookUp(matched.substr(0, matched.length - 1)) + '!'
-  })
-}
-
-export function ensureSheetNumber (label: string): string {
-  if (label.indexOf('!') <= 0) label = '1!' + label.replace(/^!/, '')
-  return label
-}

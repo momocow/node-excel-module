@@ -7,12 +7,10 @@ import ValueError from '../../errors/ValueError'
 export default class Column extends Axis {
   public readonly index: Index
 
-  constructor (index: number) {
-    if (Number.isNaN(index)) throw new ValueError(`The index should not be NaN.`)
-
+  constructor (index: Index) {
     super()
 
-    this.index = new Index(index, 0)
+    this.index = index
   }
 
   get label () {
@@ -22,6 +20,6 @@ export default class Column extends Axis {
   static from (label: string): Column {
     const index = label.replace(/^\$/, '').toLowerCase()
     // base26 is 1-based index
-    return new Column(base26.from(index) - 1)
+    return new Column(new Index(base26.from(index), 1))
   }
 }
