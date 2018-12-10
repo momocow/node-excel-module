@@ -1,8 +1,6 @@
-import Labelable from './coordinate/Labelable'
 import Reference from './coordinate/Reference'
 import Range from './coordinate/Range'
 import Sheet from './coordinate/axis/Sheet'
-import Vector from './coordinate/Vector'
 
 const { Parser: FormulaParser } = require('hot-formula-parser')
 
