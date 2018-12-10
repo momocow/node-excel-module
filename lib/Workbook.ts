@@ -19,6 +19,7 @@ import { evalFormula } from './sandbox/eval-formula'
 
 import { debug } from './debug'
 import Reference from './coordinate/Reference'
+import ValueError from './errors/ValueError'
 
 interface CompileOptions {
   exposeCells?: boolean
@@ -44,6 +45,16 @@ class EmptyWorkbookError extends Error {
 }
 
 export default class Workbook extends WorkbookBase {
+  private normalizeLabel (label: string): string {
+    const sheetEnsured = ensureSheetNumber(
+      mapSheetName2Index(label, (sheet) => this.getWorksheet(sheet).id)
+    )
+    if (!/(\d+)!\$?([a-zA-Z]+)\$?(\d+)/.test(sheetEnsured)) {
+      throw new ValueError(`Unexpected cell reference value, "${label}".`)
+    }
+    return sheetEnsured
+  }
+
   public async compile<T extends Record<string, CellSpec>> (
     spec: T,
     options: CompileOptions = {}
@@ -54,15 +65,11 @@ export default class Workbook extends WorkbookBase {
 
     debug('# Spec %o', spec)
 
-    const ensureSheet = (label: string) => ensureSheetNumber(
-      mapSheetName2Index(label, (sheet) => this.getWorksheet(sheet).id)
-    )
-
     /**
      * MUST be serializable
      */
     const context: Record<string, any> = await buildContext(
-      Object.values(spec).map(c => Reference.from(ensureSheet(c.cell))),
+      Object.values(spec).map(c => Reference.from(this.normalizeLabel(c.cell))),
       (cell: Reference, done: (err: Error | null, value: any) => void) => {
         debug('## Cell[%s]', cell)
 
@@ -116,7 +123,7 @@ export default class Workbook extends WorkbookBase {
       let cellType: CellType = spec[key].type ? spec[key].type
         : spec[key].args ? Function
           : String
-      let cell: Reference = Reference.from(ensureSheet(spec[key].cell))
+      let cell: Reference = Reference.from(this.normalizeLabel(spec[key].cell))
 
       debug('### Exported as a %s', cellType.name)
       debug('### Cell[%s]', cell)
@@ -127,10 +134,16 @@ export default class Workbook extends WorkbookBase {
       if (cellType === Function) {
         exports[key] = typeof cellValue === 'string' && cellValue.startsWith('=')
           ? wrapFunc(evalFormula, {
-            entry: cell.toString().replace('!', '.'),
+            entry: cell.toString(),
             ...context,
-            args: spec[key].args
-          }, 'localContext')
+            args: !spec[key].args
+              ? undefined
+              // spec[key].args! to suppress TS2532
+              // (why "!spec[key].args" does not persuade the typeguard?)
+              : spec[key].args!.map(
+                argCell => Reference.from(this.normalizeLabel(argCell)).toString()
+              )
+          })
         : wrapFunc(function () {
           return context.value
         }, {

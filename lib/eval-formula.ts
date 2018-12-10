@@ -1,47 +1,50 @@
-export function evalFormula (context: Record<string, any>, ...evalArgs: any[]) {
-  function _get (obj: Record<string, any>, path: string, defaultValue?: any): any {
-    for (let tok of path.split('.')) {
-      if (typeof obj === 'object' && tok in obj) {
-        obj = obj[tok]
-      } else {
-        return defaultValue
-      }
-    }
-    return obj
+interface NormalizedLabel {
+  label: string
+  sheet: number
+  column: string
+  row: number
+}
+
+interface EvalContext extends Record<string, any> {
+  args?: string[]
+  entry?: string
+}
+
+export function evalFormula (context: EvalContext, ...evalArgs: any[]) {
+
+  // /***** Common Methods *****/
+
+  function createError (name: string, msg?: string): Error {
+    const e = new Error(msg)
+    e.name = name
+    return e
   }
 
-  function _set (obj: Record<string, any>, path: string, value: any) {
-    const arrPath = path.split('.')
-    for (let tok of arrPath.slice(0, -1)) {
-      if (typeof obj[tok] !== 'object') {
-        obj[tok] = {}
-      }
-      obj = obj[tok]
+  function normalizeLabel (label: string): NormalizedLabel {
+    const sheetEnsured = label.indexOf('!') <= 0 ? '1!' + label.replace(/^!/, '') : label
+    const matched = sheetEnsured.match(/(\d+)!\$?([a-zA-Z]+)\$?(\d+)/)
+    if (!matched) throw createError('InvalidCellLabelError', `Cannot recognize "${label}".`)
+    return {
+      label: sheetEnsured,
+      sheet: Number(matched[1]),
+      column: String(matched[2]),
+      row: Number(matched[3])
     }
-
-    obj[arrPath[arrPath.length - 1]] = value
   }
 
-  function parseCoord (label: string): string {
-    const matched = label.match(/(\d+!)?\$?([A-Z]+)\$?(\d+)/)
-    if (!matched) {
-      let e = new Error('Invalid cell named "' + label + '".')
-      e.name = 'InvalidCellError'
-      throw e
-    }
-    return (matched[1] || 1) + '.$' + matched[2] + '$' + matched[3]
-  }
+  // /**************************/
 
   // context replacement
-  if (Array.isArray(context.args)) {
+  if (context.args) {
     context.args.forEach((arg, i) => {
-      arg = parseCoord(arg)
-      _set(context, arg, evalArgs[i] || _get(context, arg))
+      const { label: argLabel } = normalizeLabel(arg)
+      context[argLabel] = evalArgs[i]
     })
   }
 
   const FormulaParser = require('hot-formula-parser').Parser
   const parser = new FormulaParser()
+
   parser.on('callCellValue', function ({ label }: { label: string }, done: Function) {
     done(
       parser.parse(
@@ -50,6 +53,7 @@ export function evalFormula (context: Record<string, any>, ...evalArgs: any[]) {
       ).result
     )
   })
+
   parser.on('callRangeValue', function (start: any, end: any, done: Function) {
     done(
       context.parseRange(start, end)
@@ -57,7 +61,8 @@ export function evalFormula (context: Record<string, any>, ...evalArgs: any[]) {
         .map((f: string) => parser.parse(String(f).replace(/^=/, '')).result)
     )
   })
-  const { error, result } = parser.parse(_get(context, context.entry).replace(/^=/, ''))
+
+  const { error, result } = parser.parse(_get(context, ).replace(/^=/, ''))
   if (error) {
     const e = new Error(error)
     e.name = 'FormulaError'
