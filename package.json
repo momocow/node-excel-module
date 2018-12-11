@@ -53,7 +53,7 @@
     "base26": "github:jameslaneconkling/base26",
     "debug": "^4.1.0",
     "exceljs": "^1.6.3",
-    "hot-formula-parser": "file:vendor/formula-parser",
+    "hot-formula-parser": "https://github.com/momocow/formula-parser/releases/download/v3.0.0-cross-sheet-ref.1/hot-formula-parser-3.0.0-cross-sheet-ref.1.tgz",
     "serialize-javascript": "^1.5.0"
   },
   "ava": {
