@@ -12,7 +12,7 @@ test('sum.xlsx', async t => {
   t.plan(9)
 
   const workbook = await excelModule.from(SUM_XLSX)
-  const api = await workbook.compile({
+  const apiFactory = await workbook.compile({
     data1: {
       type: Number,
       cell: 'A1'
@@ -34,6 +34,7 @@ test('sum.xlsx', async t => {
       ]
     }
   })
+  const api = apiFactory()
 
   t.is(api.data1, 1)
   t.is(api.data2, '2')
@@ -42,18 +43,21 @@ test('sum.xlsx', async t => {
   t.is(api.sumAll(), 21)
   t.is(api.sumAll(5, 6, 7, 8, 9, 10), 45)
 
-  // output function is serializable
-  const newSum = eval(`(${api.sum.toString()})`)
-  t.not(newSum, api.sum)
-  t.is(newSum(), 3)
-  t.is(newSum(3, 4), 7)
+  // apiFactory function is serializable
+  /**
+   * @type {typeof api}
+   */
+  const newAPI = eval(`(${apiFactory.toString()})`)()
+  t.not(newAPI.sum, api.sum)
+  t.is(newAPI.sum(), 3)
+  t.is(newAPI.sum(3, 4), 7)
 })
 
 test('cross-sheet.xlsx', async t => {
   t.plan(2)
 
   const workbook = await excelModule.from(CROSS_SHEET_XLSX)
-  const api = await workbook.compile({
+  const api = (await workbook.compile({
     sum1: {
       type: Function,
       cell: 'B1',
@@ -81,7 +85,7 @@ test('cross-sheet.xlsx', async t => {
         's1!A5'
       ]
     }
-  })
+  }))()
 
   const nums = []
   for (let i = 0; i < 10; i++) {

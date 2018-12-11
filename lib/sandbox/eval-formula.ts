@@ -1,15 +1,11 @@
 import { FormulaParserReference } from '../formula-parser/FormulaParserReference'
 
-interface EvalContext extends Record<string, any> {
-  args?: string[]
-  entry?: string
-}
+const context: Record<string, any> = {}
 
 /**
  * Context always has the coordinates in absolute format.
  */
-export function evalFormula (context: EvalContext, ...evalArgs: any[]) {
-
+export function evalFormula (entry: string, args: string[], ...evalArgs: any[]) {
   // /***** Common Methods *****/
 
   function createError (name: string, msg?: string): Error {
@@ -54,10 +50,12 @@ export function evalFormula (context: EvalContext, ...evalArgs: any[]) {
 
   // /**************************/
 
+  const localContext: Record<string, any> = Object.assign({}, context)
+
   // context replacement
-  if (context.args) {
-    context.args.forEach((arg, i) => {
-      context[arg] = evalArgs[i] === undefined ? context[arg] : evalArgs[i]
+  if (Array.isArray(args)) {
+    args.forEach((arg, i) => {
+      localContext[arg] = evalArgs[i] === undefined ? context[arg] : evalArgs[i]
     })
   }
 
@@ -67,7 +65,7 @@ export function evalFormula (context: EvalContext, ...evalArgs: any[]) {
 
   parser.on('callCellValue', function ({ label, sheet }: FormulaParserReference, done: Function) {
     try {
-      done(parser.parse(`${context[`${sheet}!${label}`]}`.replace(/^=/, '')).result)
+      done(parser.parse(`${localContext[`${sheet}!${label}`]}`.replace(/^=/, '')).result)
     } catch (e) {
       errors.push(e)
     }
@@ -80,18 +78,18 @@ export function evalFormula (context: EvalContext, ...evalArgs: any[]) {
   ) {
     try {
       done(parseRange(start, end).map(
-        (labels: string[]) => labels.map(label => parser.parse(`${context[label]}`.replace(/^=/, '')).result)
+        (labels: string[]) => labels.map(label => parser.parse(`${localContext[label]}`.replace(/^=/, '')).result)
       ))
     } catch (e) {
       errors.push(e)
     }
   })
 
-  if (!context.entry) {
+  if (!entry) {
     throw createError('EntryError', 'The entry cell is not defined.')
   }
 
-  const { error, result } = parser.parse(`${context[context.entry]}`.replace(/^=/, ''))
+  const { error, result } = parser.parse(`${localContext[entry]}`.replace(/^=/, ''))
 
   if (errors.length > 0) throw errors[0]
 

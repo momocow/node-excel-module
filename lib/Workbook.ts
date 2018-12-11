@@ -41,6 +41,8 @@ class EmptyWorkbookError extends Error {
   }
 }
 
+const _evalFormula: typeof evalFormula = () => 0
+
 export default class Workbook extends WorkbookBase {
   private normalizeCoords (label: string, defaultSheet: number): string {
     return label.replace(
@@ -71,7 +73,7 @@ export default class Workbook extends WorkbookBase {
   public async compile<T extends Record<string, CellSpec>> (
     spec: T,
     options: CompileOptions = {}
-  ): Promise<{
+  ): Promise<() => {
     [K in keyof T]: ReturnType<T[K]['type']>
   }> {
     if (this.worksheets.length === 0) throw new EmptyWorkbookError()
@@ -135,7 +137,7 @@ export default class Workbook extends WorkbookBase {
     )
     debug('# Context => %s', await dumpToFile('context.json', JSON.stringify(context, null, 2)))
 
-    const exports: Record<string, any> = {}
+    const exports: Record<string, any> = { }
 
     for (let key of Object.keys(spec)) {
       debug('## Exporting member[%s]', key)
@@ -153,9 +155,10 @@ export default class Workbook extends WorkbookBase {
 
       if (cellType === Function) {
         exports[key] = typeof cellValue === 'string' && cellValue.startsWith('=')
-          ? wrapFunc(evalFormula, {
+          ? wrapFunc(function (entry: string, args: string[], ...evalArgs: any[]) {
+            return _evalFormula(entry, args, ...evalArgs)
+          }, {
             entry: cell.toString(),
-            ...context,
             args: !spec[key].args
               ? undefined
               // spec[key].args! to suppress TS2532
@@ -164,8 +167,8 @@ export default class Workbook extends WorkbookBase {
                 argCell => Reference.from(this.normalizeCoords(argCell, 1)).toString()
               )
           })
-        : wrapFunc(function () {
-          return context.value
+        : wrapFunc(function (value: string) {
+          return context[value]
         }, {
           value: cellValue
         })
@@ -182,17 +185,19 @@ export default class Workbook extends WorkbookBase {
       }
     }
 
-    const dataExports: Record<string, any> = {}
-    for (let k of Object.keys(exports)) {
-      if (typeof exports[k] === 'function') {
-        debug('# Exports[%s] => %s', k, await dumpToFile(`exports/${k}.js`, exports[k].toString()))
-      } else {
-        dataExports[k] = exports[k]
-      }
-    }
-
-    return exports as {
+    const exportsFactory = wrapFunc(function (context: Record<string, any>, exports: Record<string, any>) {
+      return exports
+    }, {
+      // global vars
+      context,
+      exports,
+      _evalFormula: evalFormula
+    }) as () => {
       [K in keyof T]: ReturnType<T[K]['type']>
     }
+
+    debug('# Exports => %s', await dumpToFile(`exports.js`, exportsFactory.toString()))
+
+    return exportsFactory
   }
 }
