@@ -23,6 +23,7 @@ Expose excel functions in a XLSX file as a JavaScript module.
     - [Workbook](#workbook)
       - [.compile()](#compile)
       - [CellSpec](#cellspec)
+      - [APIFactory](#apifactory)
   - [Example](#example)
   - [License](#license)
 
@@ -59,7 +60,7 @@ Workbook is a descendant class inherited from [Exceljs.Workbook](https://github.
 - Parameters
   - spec `Record<string, CellSpec>` The keys of exported object will be the same as the `spec` object, which are names of exported APIs.
 - Return
-  - `Record<string, any>` the exported object
+  - [`APIFactory`](#apifactory) the exported object
 
 #### CellSpec
 The `type` should be one of the following constructors, `Number`, `Boolean`, `String` and `Function`.
@@ -76,6 +77,11 @@ type CellType = |
   NumberConstructor |
   StringConstructor |
   BooleanConstructor
+```
+
+#### APIFactory
+```ts
+type APIFactory = () => Record<string, any>
 ```
 
 When specifying cells, use excel syntax like `A1`, `$B$2`. **Note** that both are all treated as absolute coordinates.
@@ -99,7 +105,7 @@ const SUM_XLSX = 'path/to/sum.xlsx'
 
 async function main () {
   const workbook = await excelModule.from(SUM_XLSX)
-  const api = await workbook.compile({
+  const apiFactory = await workbook.compile({
     data1: {
       type: Number,
       cell: 'A1'
@@ -121,6 +127,8 @@ async function main () {
       ]
     }
   })
+
+  const api = apiFactory()
 
   assert(api.data1 === 1)
   assert(api.data2 === '2')
