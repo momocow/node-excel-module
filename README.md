@@ -1,11 +1,18 @@
 # node-excel-module
 Expose excel functions in a XLSX file as a JavaScript module.
 
-[![Build Status](https://travis-ci.org/momocow/node-excel-module.svg?branch=master)](https://travis-ci.org/momocow/node-excel-module)
 [![npm](https://img.shields.io/npm/v/excel-module.svg)](https://www.npmjs.com/excel-module)
 ![GitHub top language](https://img.shields.io/github/languages/top/momocow/node-excel-module.svg)
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
 [![Gitmoji](https://img.shields.io/badge/gitmoji-%20😜%20😍-FFDD67.svg?style=flat-square)](https://gitmoji.carloscuesta.me/)
+
+> **master**
+> ---
+> [![Build Status](https://travis-ci.org/momocow/node-excel-module.svg?branch=master)](https://travis-ci.org/momocow/node-excel-module)
+
+> **dev**
+> ---
+> [![Build Status](https://travis-ci.org/momocow/node-excel-module.svg?branch=dev)](https://travis-ci.org/momocow/node-excel-module)
 
 - [node-excel-module](#node-excel-module)
   - [Introduction](#introduction)
@@ -16,8 +23,8 @@ Expose excel functions in a XLSX file as a JavaScript module.
     - [Workbook](#workbook)
       - [.compile()](#compile)
       - [CellSpec](#cellspec)
+      - [APIFactory](#apifactory)
   - [Example](#example)
-    - [More examples](#more-examples)
   - [License](#license)
 
 ## Introduction
@@ -27,6 +34,7 @@ Expose excel functions in a XLSX file as a JavaScript module.
 - The exported object is serializable; that is, the exported object can be serialized to strings through libraries like [serialize-javascript](https://github.com/yahoo/serialize-javascript).
 - Merged cells and shared formulas are supported.
 - The minimum raw data is included into the compiled context. It works like a charm even if a formula requires the result from another formula.
+- Cross-sheet reference supported.
 
 ## Installation
 ```
@@ -52,7 +60,7 @@ Workbook is a descendant class inherited from [Exceljs.Workbook](https://github.
 - Parameters
   - spec `Record<string, CellSpec>` The keys of exported object will be the same as the `spec` object, which are names of exported APIs.
 - Return
-  - `Record<string, any>` the exported object
+  - [`APIFactory`](#apifactory) the exported object
 
 #### CellSpec
 The `type` should be one of the following constructors, `Number`, `Boolean`, `String` and `Function`.
@@ -71,61 +79,84 @@ type CellType = |
   BooleanConstructor
 ```
 
-When specifying cells, use excel syntax like `A1`, `$B$2`. **Note** that both are all treated as absolute coordinates.
+#### APIFactory
+```ts
+type APIFactory = () => Record<string, any>
+```
 
-> **Caveat**
-> -----------------------
-> Cross-sheet reference is not yet supported since hot-formula-parser does not support it yet.
-> 
-> See https://github.com/handsontable/formula-parser/issues/30.
+When specifying cells, use excel syntax like `A1`, `$B$2`. **Note** that both are all treated as absolute coordinates.
 
 
 ## Example
-- `a.xlsx`
+See [integration tests](./test/integration/excel-module.test.js) for more details.
 
-  | Row\Col | `A` | `B` | `C`         |
-  | ------- | --- | --- | ----------- |
-  | `1`     | 1   | 2   | =SUM(A1:A2) |
+- **sum.xlsx**
+<table style="text-align: center;">
+  <tr><th>row\col</th><th>A</th><th>B</th><th>C</th></tr>
+  <tr><th>1</th><td>1</td><td>2</td><td>=SUM(A1:B1)</td></tr>
+  <tr><th>2</th><td>3</td><td>4</td><td>=SUM(A2:B2)</td></tr>
+  <tr><th>3</th><td>5</td><td>6</td><td>=SUM(A3:B3)</td></tr>
+  <tr><th>4</th><td colspan="3">=SUM(A1:B1)</td></tr>
+</table>
 
-- `sum.js`
+- **index.js**
 ```js
-const excelModule = require('excel-module')
+const SUM_XLSX = 'path/to/sum.xlsx'
 
-// 1. Given a xlsx file path to read
-const workbook = excelModule.from('./a.xlsx')
+async function main () {
+  const workbook = await excelModule.from(SUM_XLSX)
+  const apiFactory = await workbook.compile({
+    data1: {
+      type: Number,
+      cell: 'A1'
+    },
+    data2: {
+      type: String,
+      cell: 'B1'
+    },
+    sum: {
+      type: Function,
+      cell: 'C1',
+      args: [ 'A1', 'B1' ]
+    },
+    sumAll: {
+      type: Function,
+      cell: 'A4',
+      args: [
+        'A1', 'B1', 'A2', 'B2', 'A3', 'B3'
+      ]
+    }
+  })
 
-// OR 2. Given a Readable stream to read
-const fs = require('fs')
-const workbook = excelModule.from(fs.createReadStream('./a.xlsx'))
+  const api = apiFactory()
 
-// Provide a spec of your excel API for compilation
-// Here in the spec of this example,
-// we define a function named `sum` which is the formula declared in C1
-// the 1st argument of `sum` is mapped to A1
-// and the 2nd argument of `sum` is mapped to A2 respectively
-const excelAPI = workbook.compile({
-  sum: {
-    type: Function,
-    cell: 'C1',
-    args: [ 'A1', 'B1' ]
-  }
-})
+  assert(api.data1 === 1)
+  assert(api.data2 === '2')
+  assert(api.sum() === 3)                      // 1 + 2 = 3
+  assert(api.sum(3, 4) === 7)                  // 3 + 4 = 7
+  assert(api.sumAll() === 21)                  // 1 + 2 + 3 + 4 + 5 + 6 = 21
+  assert(api.sumAll(5, 6, 7, 8, 9, 10) === 45) // 5 + 6 + 7 + 8 + 9 + 10 = 45
+}
 
-// Using default args
-assert(excelAPI.sum() === 3)
-
-// Using the args mappings
-// now A1 is 3 and B1 is 4 ONLY in this calculation (=SUM(A1:A2))
-// the underlying data remains unchanged
-assert(excelAPI.sum(3, 4) === 7)
-
-// raw data (since `exposeCells === true`)
-assert(excelAPI.A1 === 1)
-assert(excelAPI.B1 === 2)
-assert(excelAPI.C1 === '=SUM(A1:A2)')
+main()
 ```
-### More examples
-You can see [integration tests](https://github.com/momocow/node-excel-module/blob/master/test/integration/excel-module.test.js#L10) for more examples.
+
+Each compiled function contains a context of raw data. The context of the example above is shown as follow.
+
+```json
+{
+  "1!$A$1": 1,
+  "1!$B$1": 2,
+  "1!$C$1": "=SUM(1!$A$1:$B$1)",
+  "1!$A$4": "=SUM(1!$C$1:$C$3)",
+  "1!$C$2": "=SUM(1!$A$2:$B$2)",
+  "1!$A$2": 3,
+  "1!$B$2": 4,
+  "1!$C$3": "=SUM(1!$A$3:$B$3)",
+  "1!$A$3": 5,
+  "1!$B$3": 6
+}
+```
 
 ## License
 [GLWTPL](LICENSE) base on https://github.com/me-shaon/GLWTPL.

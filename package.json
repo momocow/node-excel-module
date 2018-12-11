@@ -36,10 +36,13 @@
     "@semantic-release/git": "^7.0.5",
     "@semantic-release/github": "^5.2.5",
     "@types/debug": "0.0.31",
+    "@types/mkdirp": "^0.5.2",
     "@types/node": "^10.12.10",
     "@types/serialize-javascript": "^1.5.0",
     "ava": "^1.0.0-rc.2",
+    "find-pkg": "^2.0.0",
     "gitmoji-cli": "^1.9.2",
+    "mkdirp": "^0.5.1",
     "semantic-release": "^15.12.4",
     "semantic-release-gitmoji": "^1.2.0",
     "tslint": "^5.11.0",
@@ -47,14 +50,18 @@
     "typescript": "^3.2.1"
   },
   "dependencies": {
-    "base26": "github:jameslaneconkling/base26",
+    "base26": "^0.1.0",
     "debug": "^4.1.0",
     "exceljs": "^1.6.3",
-    "hot-formula-parser": "^3.0.0",
+    "hot-formula-parser": "https://github.com/momocow/formula-parser/releases/download/v3.0.0-csr.2/hot-formula-parser-3.0.0-cross-sheet-ref.2.tgz",
     "serialize-javascript": "^1.5.0"
   },
   "ava": {
     "babel": false,
     "compileEnhancements": false
-  }
+  },
+  "files": [
+    "dist",
+    "vendor"
+  ]
 }

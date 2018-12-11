@@ -3,31 +3,25 @@ import {
   ValueType,
   CellErrorValue,
   CellHyperlinkValue,
-  CellRichTextValue,
-  CellFormulaValue,
-  FormulaType,
-  CellSharedFormulaValue
+  CellRichTextValue
 } from 'exceljs'
+
+import buildContext from './build-context'
 
 import {
   wrapFunc,
-  parseRange,
-  buildContext,
-  formatValue,
-  resolveSharedFormula
+  formatValue
 } from './utils'
 
-import {
-  Coordinate
-} from './coordinate'
+import { evalFormula } from './sandbox/eval-formula'
 
-import { evalFormula } from './eval-formula'
-
-import { debug } from './debug'
+import { debug, dumpToFile } from './debug'
+import Reference from './coordinate/Reference'
 
 interface CompileOptions {
+  exposeCells?: boolean
 }
-Number(1)
+
 type CellType = |
   FunctionConstructor |
   NumberConstructor |
@@ -47,77 +41,103 @@ class EmptyWorkbookError extends Error {
   }
 }
 
+const _evalFormula: typeof evalFormula = () => 0
+
 export default class Workbook extends WorkbookBase {
-  public compile<T extends Record<string, CellSpec>> (
+  private normalizeCoords (label: string, defaultSheet: number): string {
+    return label.replace(
+      // worksheet naming conventions
+      // @see http://www.excelcodex.com/2012/06/worksheets-naming-conventions/
+      // Additional exclusion: +-()
+      /(?:'?([^\-(),:?+*'/\\]+)'?!)?\$?([a-zA-Z]+)\$?(\d+)(?::\$?([a-zA-Z]+)\$?(\d+))?/g,
+      (
+        label,
+        sheet: string | undefined,
+        col1: string,
+        row1: string,
+        col2?: string,
+        row2?: string
+      ): string => {
+        debug('normalizeCoords(): from %o', { label, sheet, col1, row1, col2, row2 })
+
+        const _sheet = `${sheet ? this.getWorksheet(sheet).id : defaultSheet}!`
+        const _ref1 = `$${col1}$${row1}`
+        const _ref2 = col2 && row2 ? `:$${col2}$${row2}` : ''
+        debug('normalizeCoords():   => to "%s"', _sheet + _ref1 + _ref2)
+
+        return _sheet + _ref1 + _ref2
+      }
+    )
+  }
+
+  public async compile<T extends Record<string, CellSpec>> (
     spec: T,
-    options?: CompileOptions
-  ): {
+    options: CompileOptions = {}
+  ): Promise<() => {
     [K in keyof T]: ReturnType<T[K]['type']>
-  } {
+  }> {
     if (this.worksheets.length === 0) throw new EmptyWorkbookError()
 
-    debug('# Spec %o', spec)
+    debug('# Spec => %s', await dumpToFile(
+      'spec.json',
+      JSON.stringify(
+        spec,
+        (k, v) => typeof v === 'function' ? v.toString() : v,
+        2
+      )
+    ))
 
     /**
      * MUST be serializable
      */
-    const context: Record<string, any> = buildContext(
-      Object.values(spec).map(c => c.cell),
-      (label: string) => {
-        let coord = new Coordinate(label)
+    const context: Record<string, any> = await buildContext(
+      Object.values(spec).map(c => Reference.from(this.normalizeCoords(c.cell, 1))),
+      (cell: Reference, done: (err: Error | null, value: any) => void) => {
+        debug('## Cell[%s]', cell)
 
-        debug('## Label[%s]: %o', label, coord.toJSON())
-
-        const worksheet = this.getWorksheet(coord.sheet)
-        let curCell = worksheet.getCell(coord.label)
-        coord = new Coordinate(curCell.$col$row)
-
-        // Ensure the cell to be the master
-        if (curCell.type === ValueType.Merge) {
-          debug('##   Use master cell')
-          curCell = curCell.master
-          coord = new Coordinate(curCell.$col$row)
-        }
+        const worksheet = this.getWorksheet(cell.sheet.index.base1)
+        let curCell = worksheet.getCell(cell.label)
 
         debug('##   = %o', curCell.value)
 
         switch (curCell.type) {
+          // merge cell is empty
+          case ValueType.Merge:
+            return done(null, '')
           // primitive values
           case ValueType.Date:
           case ValueType.Boolean:
           case ValueType.Null:
           case ValueType.Number:
           case ValueType.String:
-            return curCell.value
+            return done(null, curCell.value)
           // text values
           case ValueType.Hyperlink:
-            return (curCell.value as CellHyperlinkValue).text
+            return done(null, (curCell.value as CellHyperlinkValue).text)
           case ValueType.RichText:
-            return (curCell.value as CellRichTextValue).richText
-              .map(t => t.text)
-              .join('')
+            return done(
+              null,
+              (curCell.value as CellRichTextValue).richText
+                .map(t => t.text)
+                .join('')
+            )
           // @TODO
           // SharedString is not documented (https://github.com/guyonroche/exceljs#value-types)
           // Leave it unimplemented until any reproducible scenarios
           // case ValueType.SharedString:
           case ValueType.Error:
-            return (curCell.value as CellErrorValue).error
+            return done(null, (curCell.value as CellErrorValue).error)
           case ValueType.Formula:
-            if (curCell.formulaType === FormulaType.Shared) {
-              curCell = worksheet.getCell((curCell.value as CellSharedFormulaValue).sharedFormula)
-              return '=' + resolveSharedFormula(
-                (curCell.value as CellFormulaValue).formula,
-                new Coordinate(curCell.$col$row),
-                coord
-              )
-            }
-            return '=' + (curCell.value as CellFormulaValue).formula
+            return done(
+              null,
+              '=' + this.normalizeCoords(curCell.formula, cell.sheet.index.base1)
+            )
         }
       }
     )
-    debug('# Context %o', context)
+    debug('# Context => %s', await dumpToFile('context.json', JSON.stringify(context, null, 2)))
 
-    const exports: Record<string, any> = {}
+    const exports: Record<string, any> = { }
 
     for (let key of Object.keys(spec)) {
       debug('## Exporting member[%s]', key)
@@ -125,35 +145,59 @@ export default class Workbook extends WorkbookBase {
       let cellType: CellType = spec[key].type ? spec[key].type
         : spec[key].args ? Function
           : String
-      let cell: string = spec[key].cell
+      let cell: Reference = Reference.from(this.normalizeCoords(spec[key].cell, 1))
 
       debug('### Exported as a %s', cellType.name)
       debug('### Cell[%s]', cell)
-      debug('###   = %o', context[cell])
+
+      const cellValue = context[cell.toString()]
+      debug('###   = %o', cellValue)
 
       if (cellType === Function) {
-        exports[key] = typeof context[cell] === 'string' && context[cell].startsWith('=')
-          ? wrapFunc(evalFormula, {
-            entry: cell,
-            ...context,
-            parseRange,
-            args: spec[key].args
-          }, 'localContext')
-        : wrapFunc(function () {
-          return context.value
+        exports[key] = typeof cellValue === 'string' && cellValue.startsWith('=')
+          ? wrapFunc(function (entry: string, args: string[], ...evalArgs: any[]) {
+            return _evalFormula(entry, args, ...evalArgs)
+          }, {
+            entry: cell.toString(),
+            args: !spec[key].args
+              ? undefined
+              // spec[key].args! to suppress TS2532
+              // (why "!spec[key].args" does not persuade the typeguard?)
+              : spec[key].args!.map(
+                argCell => Reference.from(this.normalizeCoords(argCell, 1)).toString()
+              )
+          })
+        : wrapFunc(function (value: string) {
+          return context[value]
         }, {
-          value: context[cell]
+          value: cellValue
         })
+
+        if (options.exposeCells) {
+          exports[cell.toString()] = exports[key]
+        }
       } else {
-        exports[key] = exports[cell] = formatValue(
-          context[cell], (cellType as Exclude<CellType, FunctionConstructor>))
+        exports[key] = formatValue(
+          cellValue, (cellType as Exclude<CellType, FunctionConstructor>))
+        if (options.exposeCells) {
+          exports[cell.toString()] = exports[key]
+        }
       }
     }
 
-    debug('# Exports %o', exports)
-
-    return exports as {
+    const exportsFactory = wrapFunc(function (context: Record<string, any>, exports: Record<string, any>) {
+      return exports
+    }, {
+      // global vars
+      context,
+      exports,
+      _evalFormula: evalFormula
+    }) as () => {
       [K in keyof T]: ReturnType<T[K]['type']>
     }
+
+    debug('# Exports => %s', await dumpToFile(`exports.js`, exportsFactory.toString()))
+
+    return exportsFactory
   }
 }
