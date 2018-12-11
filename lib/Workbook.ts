@@ -44,7 +44,7 @@ class EmptyWorkbookError extends Error {
 export default class Workbook extends WorkbookBase {
   private normalizeCoords (label: string, defaultSheet: number): string {
     return label.replace(
-      /(?:(.+?)!)?\$?([a-zA-Z]+)\$?(\d+)(?::\$?([a-zA-Z]+)\$?(\d+))?/g,
+      /(?:'?([^']+)'?!)?\$?([a-zA-Z]+)\$?(\d+)(?::\$?([a-zA-Z]+)\$?(\d+))?/g,
       (
         label,
         sheet: string | undefined,
@@ -53,9 +53,13 @@ export default class Workbook extends WorkbookBase {
         col2?: string,
         row2?: string
       ): string => {
+        debug('normalizeCoords(): from %o', { label, sheet, col1, row1, col2, row2 })
+
         const _sheet = `${sheet ? this.getWorksheet(sheet).id : defaultSheet}!`
         const _ref1 = `$${col1}$${row1}`
         const _ref2 = col2 && row2 ? `:$${col2}$${row2}` : ''
+        debug('normalizeCoords():   => to "%s"', _sheet + _ref1 + _ref2)
+
         return _sheet + _ref1 + _ref2
       }
     )
