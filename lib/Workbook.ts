@@ -44,7 +44,10 @@ class EmptyWorkbookError extends Error {
 export default class Workbook extends WorkbookBase {
   private normalizeCoords (label: string, defaultSheet: number): string {
     return label.replace(
-      /(?:'?([^']+)'?!)?\$?([a-zA-Z]+)\$?(\d+)(?::\$?([a-zA-Z]+)\$?(\d+))?/g,
+      // worksheet naming conventions
+      // @see http://www.excelcodex.com/2012/06/worksheets-naming-conventions/
+      // Additional exclusion: +-()
+      /(?:'?([^\-(),:?+*'/\\]+)'?!)?\$?([a-zA-Z]+)\$?(\d+)(?::\$?([a-zA-Z]+)\$?(\d+))?/g,
       (
         label,
         sheet: string | undefined,

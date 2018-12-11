@@ -8,7 +8,7 @@ export default async function buildContext (
   context: Record<string, any> = {}
 ): Promise<Record<string, any>> {
   debug('buildContext(): entry point = %o', entries.map(ref => ref.label))
-  debug('buildContext(): initial context = %o', context)
+  // debug('buildContext(): initial context = %o', context)
 
   for (let cell of entries) {
     await new Promise(function (resolve, reject) {
@@ -27,7 +27,7 @@ export default async function buildContext (
             debug('buildContext(): operand cells = %o', operands)
             if (operands.length > 0) {
               Object.assign(context, await buildContext(operands, lookUp, context))
-              debug('buildContext(): new context = %o', context)
+              // debug('buildContext(): new context = %o', context)
             }
           }
         } catch (err) {
