@@ -29,20 +29,32 @@ export class Formula {
   }
 
   getOperandCells (): Reference[] {
+    let errs: Error[] = []
     let cells: Reference[] = []
     const parser = new FormulaParser()
     parser.on('callCellValue', (cell: FormulaParserReference) => {
-      cells.push(createReference(cell, this.sheet))
+      try {
+        cells.push(createReference(cell, this.sheet))
+      } catch (e) {
+        errs.push(e)
+      }
     })
     parser.on('callRangeValue', (start: FormulaParserReference, end: FormulaParserReference) => {
-      cells = cells.concat(
-        new Range(
-          createReference(start, this.sheet),
-          createReference(end, this.sheet)
-        ).toArray()
-      )
+      try {
+        cells = cells.concat(
+          new Range(
+            createReference(start, this.sheet),
+            createReference(end, this.sheet)
+          ).toArray()
+        )
+      } catch (e) {
+        errs.push(e)
+      }
     })
     parser.parse(this.formula)
+
+    if (errs.length > 0) throw errs[0]
+
     return cells
   }
 

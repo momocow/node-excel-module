@@ -12,7 +12,7 @@ export default class Sheet extends Axis {
   }
 
   get label () {
-    return `${this.index}!`
+    return `${this.index.base1}!`
   }
 
   get abs () {

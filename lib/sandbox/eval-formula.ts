@@ -43,7 +43,7 @@ export function evalFormula (context: EvalContext, ...evalArgs: any[]) {
     const ret: string[] = []
     for (let y = start.row.index; y <= end.row.index; y++) {
       for (let x = start.column.index; x <= end.column.index; x++) {
-        ret.push(`${toBase26(x)}${y + 1}`)
+        ret.push(`${start.sheet}!$${toBase26(x).toUpperCase()}$${y + 1}`)
       }
     }
 
@@ -55,15 +55,20 @@ export function evalFormula (context: EvalContext, ...evalArgs: any[]) {
   // context replacement
   if (context.args) {
     context.args.forEach((arg, i) => {
-      context[arg] = evalArgs[i]
+      context[arg] = evalArgs[i] === undefined ? context[arg] : evalArgs[i]
     })
   }
 
+  const errors: Error[] = []
   const FormulaParser = require('hot-formula-parser').Parser
   const parser = new FormulaParser()
 
   parser.on('callCellValue', function ({ label, sheet }: FormulaParserReference, done: Function) {
-    done(parser.parse(context[`${sheet}!${label}`].replace(/^=/, '')).result)
+    try {
+      done(parser.parse(`${context[`${sheet}!${label}`]}`.replace(/^=/, '')).result)
+    } catch (e) {
+      errors.push(e)
+    }
   })
 
   parser.on('callRangeValue', function (
@@ -71,16 +76,23 @@ export function evalFormula (context: EvalContext, ...evalArgs: any[]) {
     end: FormulaParserReference,
     done: Function
   ) {
-    done(parseRange(start, end).map(
-      (label: string) => parser.parse(context[label].replace(/^=/, '')).result
-    ))
+    try {
+      done(parseRange(start, end).map(
+        (label: string) => parser.parse(`${context[label]}`.replace(/^=/, '')).result
+      ))
+    } catch (e) {
+      errors.push(e)
+    }
   })
 
   if (!context.entry) {
     throw createError('EntryError', 'The entry cell is not defined.')
   }
 
-  const { error, result } = parser.parse(context.entry.replace(/^=/, ''))
+  const { error, result } = parser.parse(`${context[context.entry]}`.replace(/^=/, ''))
+
+  if (errors.length > 0) throw errors[0]
+
   if (error) {
     throw createError('FormulaError', error)
   }

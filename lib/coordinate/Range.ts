@@ -12,7 +12,7 @@ export default class Range implements Labelable {
   }
 
   toArray () {
-    const unitVector = Vector.from(this.end.label, this.start.label).normalize()
+    const unitVector = Vector.from(this.end.toString(), this.start.toString()).normalize()
     const ret = []
     for (
       let curRef = this.start;

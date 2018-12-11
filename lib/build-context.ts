@@ -7,7 +7,7 @@ export default async function buildContext (
   lookUp: (label: Reference, done: (err: Error | null, value: any) => void) => any,
   context: Record<string, any> = {}
 ): Promise<Record<string, any>> {
-  debug('buildContext(): entry point = %o', entries)
+  debug('buildContext(): entry point = %o', entries.map(ref => ref.label))
   debug('buildContext(): initial context = %o', context)
 
   for (let cell of entries) {

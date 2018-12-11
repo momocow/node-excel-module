@@ -1,11 +1,10 @@
-import * as base26 from 'base26'
-
 import Column from './axis/Column'
 import Row from './axis/Row'
 import Sheet from './axis/Sheet'
 import ValueError from '../errors/ValueError'
 import Vector from './Vector'
 import Labelable from './Labelable'
+import Index from './axis/Index'
 
 /**
  * Reference is the absolute cell reference used in excel
@@ -21,8 +20,8 @@ export default class Reference implements Labelable {
   public offset (vec: Vector) {
     return new Reference(
       this.sheet,
-      new Column(this.column.index.base0 + vec.colOffset),
-      new Row(this.row.index.base0 + vec.rowOffset)
+      new Column(new Index(this.column.index.base0 + vec.colOffset, 0)),
+      new Row(new Index(this.row.index.base0 + vec.rowOffset, 0))
     )
   }
 

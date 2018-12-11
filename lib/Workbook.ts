@@ -15,9 +15,8 @@ import {
 
 import { evalFormula } from './sandbox/eval-formula'
 
-import { debug } from './debug'
+import { debug, dumpToFile } from './debug'
 import Reference from './coordinate/Reference'
-import ValueError from './errors/ValueError'
 
 interface CompileOptions {
   exposeCells?: boolean
@@ -43,21 +42,23 @@ class EmptyWorkbookError extends Error {
 }
 
 export default class Workbook extends WorkbookBase {
-  private normalizeCoords (label: string): string {
+  private normalizeCoords (label: string, defaultSheet: number): string {
     return label.replace(
       /(?:(.+?)!)?\$?([a-zA-Z]+)\$?(\d+)(?::\$?([a-zA-Z]+)\$?(\d+))?/g,
-      (label, sheet, col1, row1, col2, row2) => {
-        
+      (
+        label,
+        sheet: string | undefined,
+        col1: string,
+        row1: string,
+        col2?: string,
+        row2?: string
+      ): string => {
+        const _sheet = `${sheet ? this.getWorksheet(sheet).id : defaultSheet}!`
+        const _ref1 = `$${col1}$${row1}`
+        const _ref2 = col2 && row2 ? `:$${col2}$${row2}` : ''
+        return _sheet + _ref1 + _ref2
       }
     )
-    
-    const sheetEnsured = ensureSheetNumber(
-      mapSheetName2Index(label, (sheet) => this.getWorksheet(sheet).id)
-    )
-    if (!/(\d+)!\$?([a-zA-Z]+)\$?(\d+)/.test(sheetEnsured)) {
-      throw new ValueError(`Unexpected cell reference value, "${label}".`)
-    }
-    return sheetEnsured
   }
 
   public async compile<T extends Record<string, CellSpec>> (
@@ -68,13 +69,20 @@ export default class Workbook extends WorkbookBase {
   }> {
     if (this.worksheets.length === 0) throw new EmptyWorkbookError()
 
-    debug('# Spec %o', spec)
+    debug('# Spec => %s', await dumpToFile(
+      'spec.json',
+      JSON.stringify(
+        spec,
+        (k, v) => typeof v === 'function' ? v.toString() : v,
+        2
+      )
+    ))
 
     /**
      * MUST be serializable
      */
     const context: Record<string, any> = await buildContext(
-      Object.values(spec).map(c => Reference.from(this.normalizeLabel(c.cell))),
+      Object.values(spec).map(c => Reference.from(this.normalizeCoords(c.cell, 1))),
       (cell: Reference, done: (err: Error | null, value: any) => void) => {
         debug('## Cell[%s]', cell)
 
@@ -114,11 +122,14 @@ export default class Workbook extends WorkbookBase {
           case ValueType.Error:
             return done(null, (curCell.value as CellErrorValue).error)
           case ValueType.Formula:
-            return done(null, '=' + curCell.formula)
+            return done(
+              null,
+              '=' + this.normalizeCoords(curCell.formula, cell.sheet.index.base1)
+            )
         }
       }
     )
-    debug('# Context %o', context)
+    debug('# Context => %s', await dumpToFile('context.json', JSON.stringify(context, null, 2)))
 
     const exports: Record<string, any> = {}
 
@@ -128,7 +139,7 @@ export default class Workbook extends WorkbookBase {
       let cellType: CellType = spec[key].type ? spec[key].type
         : spec[key].args ? Function
           : String
-      let cell: Reference = Reference.from(this.normalizeLabel(spec[key].cell))
+      let cell: Reference = Reference.from(this.normalizeCoords(spec[key].cell, 1))
 
       debug('### Exported as a %s', cellType.name)
       debug('### Cell[%s]', cell)
@@ -146,7 +157,7 @@ export default class Workbook extends WorkbookBase {
               // spec[key].args! to suppress TS2532
               // (why "!spec[key].args" does not persuade the typeguard?)
               : spec[key].args!.map(
-                argCell => Reference.from(this.normalizeLabel(argCell)).toString()
+                argCell => Reference.from(this.normalizeCoords(argCell, 1)).toString()
               )
           })
         : wrapFunc(function () {
@@ -167,7 +178,14 @@ export default class Workbook extends WorkbookBase {
       }
     }
 
-    debug('# Exports %o', exports)
+    const dataExports: Record<string, any> = {}
+    for (let k of Object.keys(exports)) {
+      if (typeof exports[k] === 'function') {
+        debug('# Exports[%s] => %s', k, await dumpToFile(`exports/${k}.js`, exports[k].toString()))
+      } else {
+        dataExports[k] = exports[k]
+      }
+    }
 
     return exports as {
       [K in keyof T]: ReturnType<T[K]['type']>
