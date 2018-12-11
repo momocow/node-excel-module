@@ -30,8 +30,10 @@ export default class Range implements Labelable {
 
       // because curRef.column.index.base0 > this.end.column.index.base0
       // so the for loop right above breaks
-      // curRef should be reset to the same x (col) as this.end
-      curRef = curRef.offset(new Vector(-1, 0))
+      // curRef should be reset in x-axis
+      curRef = curRef.offset(
+        new Vector(-1 * (this.end.column.index.base0 - this.start.column.index.base0 + 1), 0)
+      )
     }
 
     return ret
