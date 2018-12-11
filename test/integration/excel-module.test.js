@@ -9,9 +9,6 @@ const CROSS_SHEET_XLSX = path.join(FIXTURE_DIR, 'cross-sheet.xlsx')
 
 
 test('sum.xlsx', async t => {
-  // fix "require" not defined
-  Object.assign(global, { require })
-
   t.plan(9)
 
   const workbook = await excelModule.from(SUM_XLSX)
@@ -54,9 +51,6 @@ test('sum.xlsx', async t => {
 
 test('cross-sheet.xlsx', async t => {
   t.plan(2)
-
-  // fix "require" not defined
-  Object.assign(global, { require })
 
   const workbook = await excelModule.from(CROSS_SHEET_XLSX)
   const api = await workbook.compile({

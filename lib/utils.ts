@@ -5,11 +5,15 @@ export function wrapFunc (
   context: Record<string, any> = {},
   contextKey: string = 'context'
 ): Function {
-  return Function(`
-    const ${contextKey} = ${serialize(context)};
-    return (${body.toString()})(${contextKey}, ...Array.from(arguments));
-    `
-  )
+  // tslint:disable-next-line:no-eval
+  return eval(`
+    (
+      function () {
+        const ${contextKey} = ${serialize(context)};
+        return (${body.toString()})(${contextKey}, ...Array.from(arguments));
+      }
+    )
+  `) as Function
 }
 
 type ValueType = StringConstructor | NumberConstructor | BooleanConstructor
