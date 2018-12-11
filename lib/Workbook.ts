@@ -93,15 +93,12 @@ export default class Workbook extends WorkbookBase {
         const worksheet = this.getWorksheet(cell.sheet.index.base1)
         let curCell = worksheet.getCell(cell.label)
 
-        // Ensure the cell to be the master
-        if (curCell.type === ValueType.Merge) {
-          debug('##   Use master Cell[%s]', curCell.$col$row)
-          curCell = curCell.master
-        }
-
         debug('##   = %o', curCell.value)
 
         switch (curCell.type) {
+          // merge cell is empty
+          case ValueType.Merge:
+            return done(null, '')
           // primitive values
           case ValueType.Date:
           case ValueType.Boolean:

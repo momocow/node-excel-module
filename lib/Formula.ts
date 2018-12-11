@@ -2,6 +2,7 @@ import Reference from './coordinate/Reference'
 import Range from './coordinate/Range'
 import Sheet from './coordinate/axis/Sheet'
 
+import { debug } from './debug'
 const { Parser: FormulaParser } = require('hot-formula-parser')
 
 interface FormulaParserAxis {
@@ -29,24 +30,31 @@ export class Formula {
   }
 
   getOperandCells (): Reference[] {
+    debug('Formula#getOperandCells()')
+
     let errs: Error[] = []
     let cells: Reference[] = []
     const parser = new FormulaParser()
     parser.on('callCellValue', (cell: FormulaParserReference) => {
       try {
-        cells.push(createReference(cell, this.sheet))
+        debug('Formula#getOperandCells(): event "callCellValue" [%s!%s]', cell.sheet, cell.label)
+        const ref = createReference(cell, this.sheet)
+        debug('Formula#getOperandCells():   => %o', ref.toString())
+        cells.push(ref)
       } catch (e) {
         errs.push(e)
       }
     })
     parser.on('callRangeValue', (start: FormulaParserReference, end: FormulaParserReference) => {
       try {
-        cells = cells.concat(
-          new Range(
-            createReference(start, this.sheet),
-            createReference(end, this.sheet)
-          ).toArray()
-        )
+        debug('Formula#getOperandCells(): event "callRangeValue" [%s!%s] => [%s!%s]',
+          start.sheet, start.label, end.sheet, end.label)
+        const refs = new Range(
+          createReference(start, this.sheet),
+          createReference(end, this.sheet)
+        ).toArray()
+        debug('Formula#getOperandCells():   => %o', refs.map(ref => ref.toString()))
+        cells = cells.concat(refs)
       } catch (e) {
         errs.push(e)
       }

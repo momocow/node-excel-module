@@ -12,16 +12,27 @@ export default class Range implements Labelable {
   }
 
   toArray () {
-    const unitVector = Vector.from(this.end.toString(), this.start.toString()).normalize()
+    const unitXVector = new Vector(1, 0)
+    const unitYVector = new Vector(0, 1)
     const ret = []
-    for (
-      let curRef = this.start;
-      !curRef.equals(this.end);
-      curRef = curRef.offset(unitVector)
+
+    let curRef = this.start
+    for (;
+      curRef.row.index.base0 <= this.end.row.index.base0;
+      curRef = curRef.offset(unitYVector)
     ) {
-      ret.push(curRef)
+      for (;
+        curRef.column.index.base0 <= this.end.column.index.base0;
+        curRef = curRef.offset(unitXVector)
+      ) {
+        ret.push(curRef)
+      }
+
+      // because curRef.column.index.base0 > this.end.column.index.base0
+      // so the for loop right above breaks
+      // curRef should be reset to the same x (col) as this.end
+      curRef = curRef.offset(new Vector(-1, 0))
     }
-    ret.push(this.end)
 
     return ret
   }

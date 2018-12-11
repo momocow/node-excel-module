@@ -31,7 +31,7 @@ test('sum.xlsx', async t => {
     },
     sumAll: {
       type: Function,
-      cell: 'B4', // merged cell
+      cell: 'A4',
       args: [
         'A1', 'B1', 'A2', 'B2', 'A3', 'B3'
       ]

@@ -1,4 +1,3 @@
-import ValueError from '../errors/ValueError'
 import Reference from './Reference'
 
 /**
