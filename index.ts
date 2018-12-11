@@ -1,3 +1,5 @@
+///<reference path="./types/base26.d.ts" />
+
 import { Readable, Writable } from 'stream'
 
 import Workbook from './lib/Workbook'

@@ -2,7 +2,6 @@ import * as base26 from 'base26'
 
 import Axis from './Axis'
 import Index from './Index'
-import ValueError from '../../errors/ValueError'
 
 export default class Column extends Axis {
   public readonly index: Index

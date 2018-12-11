@@ -50,7 +50,7 @@
     "typescript": "^3.2.1"
   },
   "dependencies": {
-    "base26": "github:jameslaneconkling/base26",
+    "base26": "^0.1.0",
     "debug": "^4.1.0",
     "exceljs": "^1.6.3",
     "hot-formula-parser": "https://github.com/momocow/formula-parser/releases/download/v3.0.0-csr.2/hot-formula-parser-3.0.0-cross-sheet-ref.2.tgz",
