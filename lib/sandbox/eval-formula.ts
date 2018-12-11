@@ -39,15 +39,17 @@ export function evalFormula (context: EvalContext, ...evalArgs: any[]) {
   function parseRange (
     start: FormulaParserReference,
     end: FormulaParserReference
-  ): string[] {
-    const ret: string[] = []
+  ): string[][] {
+    const rety: string[][] = []
     for (let y = start.row.index; y <= end.row.index; y++) {
+      const retx: string[] = []
       for (let x = start.column.index; x <= end.column.index; x++) {
-        ret.push(`${start.sheet}!$${toBase26(x).toUpperCase()}$${y + 1}`)
+        retx.push(`${start.sheet}!$${toBase26(x).toUpperCase()}$${y + 1}`)
       }
+      rety.push(retx)
     }
 
-    return ret
+    return rety
   }
 
   // /**************************/
@@ -78,7 +80,7 @@ export function evalFormula (context: EvalContext, ...evalArgs: any[]) {
   ) {
     try {
       done(parseRange(start, end).map(
-        (label: string) => parser.parse(`${context[label]}`.replace(/^=/, '')).result
+        (labels: string[]) => labels.map(label => parser.parse(`${context[label]}`.replace(/^=/, '')).result)
       ))
     } catch (e) {
       errors.push(e)
