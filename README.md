@@ -1,11 +1,18 @@
 # node-excel-module
 Expose excel functions in a XLSX file as a JavaScript module.
 
-[![Build Status](https://travis-ci.org/momocow/node-excel-module.svg?branch=master)](https://travis-ci.org/momocow/node-excel-module)
 [![npm](https://img.shields.io/npm/v/excel-module.svg)](https://www.npmjs.com/excel-module)
 ![GitHub top language](https://img.shields.io/github/languages/top/momocow/node-excel-module.svg)
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
 [![Gitmoji](https://img.shields.io/badge/gitmoji-%20😜%20😍-FFDD67.svg?style=flat-square)](https://gitmoji.carloscuesta.me/)
+
+> **master**
+> ---
+> [![Build Status](https://travis-ci.org/momocow/node-excel-module.svg?branch=master)](https://travis-ci.org/momocow/node-excel-module)
+
+> **dev**
+> ---
+> [![Build Status](https://travis-ci.org/momocow/node-excel-module.svg?branch=dev)](https://travis-ci.org/momocow/node-excel-module)
 
 - [node-excel-module](#node-excel-module)
   - [Introduction](#introduction)
@@ -73,12 +80,6 @@ type CellType = |
 
 When specifying cells, use excel syntax like `A1`, `$B$2`. **Note** that both are all treated as absolute coordinates.
 
-> **Caveat**
-> -----------------------
-> Cross-sheet reference is not yet supported since hot-formula-parser does not support it yet.
-> 
-> See https://github.com/handsontable/formula-parser/issues/30.
-
 
 ## Example
 See [integration tests](./test/integration/excel-module.test.js) for more details.
@@ -114,7 +115,7 @@ async function main () {
     },
     sumAll: {
       type: Function,
-      cell: 'B4', // merged cell
+      cell: 'A4',
       args: [
         'A1', 'B1', 'A2', 'B2', 'A3', 'B3'
       ]
@@ -139,7 +140,7 @@ Each compiled function contains a context of raw data. The context of the exampl
   "1!$A$1": 1,
   "1!$B$1": 2,
   "1!$C$1": "=SUM(1!$A$1:$B$1)",
-  "1!$B$4": "=SUM(1!$C$1:$C$3)",
+  "1!$A$4": "=SUM(1!$C$1:$C$3)",
   "1!$C$2": "=SUM(1!$A$2:$B$2)",
   "1!$A$2": 3,
   "1!$B$2": 4,
