@@ -4,7 +4,7 @@ import { Formula } from './Formula'
 
 export default async function buildContext (
   entries: Reference[],
-  lookUp: (label: Reference, done: (err: Error | null, value: any) => void) => any,
+  lookUp: (label: Reference, done: (err: Error | null, value: any, result: any) => void) => any,
   context: Record<string, any> = {}
 ): Promise<Record<string, any>> {
   debug('buildContext(): entry point = %o', entries.map(ref => ref.label))
@@ -22,7 +22,16 @@ export default async function buildContext (
             debug('buildContext(): formula %o', value)
 
             const formula = Formula.from(value, cell.sheet)
-            const operands = formula.getOperandCells()
+            const operands = formula.getMembers((ref, done) => {
+              lookUp(ref, (err, v, result) => {
+                if (err) {
+                  done(err, null)
+                  return
+                }
+
+                done(null, result)
+              })
+            })
 
             debug('buildContext(): operand cells = %o', operands)
             if (operands.length > 0) {
