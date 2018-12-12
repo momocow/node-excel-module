@@ -92,7 +92,7 @@ export default class Workbook extends WorkbookBase {
      */
     const context: Record<string, any> = await buildContext(
       Object.values(spec).map(c => Reference.from(this.normalizeCoords(c.cell, 1))),
-      (cell: Reference, done: (err: Error | null, value: any) => void) => {
+      (cell: Reference, done: (err: Error | null, value: any, result: any) => void) => {
         debug('## Cell[%s]', cell)
 
         const worksheet = this.getWorksheet(cell.sheet.index.base1)
@@ -103,34 +103,33 @@ export default class Workbook extends WorkbookBase {
         switch (curCell.type) {
           // merge cell is empty
           case ValueType.Merge:
-            return done(null, '')
+            return done(null, '', '')
           // primitive values
           case ValueType.Date:
           case ValueType.Boolean:
           case ValueType.Null:
           case ValueType.Number:
           case ValueType.String:
-            return done(null, curCell.value)
+            return done(null, curCell.value, curCell.value)
           // text values
           case ValueType.Hyperlink:
-            return done(null, (curCell.value as CellHyperlinkValue).text)
+            return done(null, (curCell.value as CellHyperlinkValue).text, (curCell.value as CellHyperlinkValue).text)
           case ValueType.RichText:
-            return done(
-              null,
-              (curCell.value as CellRichTextValue).richText
-                .map(t => t.text)
-                .join('')
-            )
+            const richTexts = (curCell.value as CellRichTextValue).richText
+              .map(t => t.text)
+              .join('')
+            return done(null, richTexts, richTexts)
           // @TODO
           // SharedString is not documented (https://github.com/guyonroche/exceljs#value-types)
           // Leave it unimplemented until any reproducible scenarios
           // case ValueType.SharedString:
           case ValueType.Error:
-            return done(null, (curCell.value as CellErrorValue).error)
+            return done(null, (curCell.value as CellErrorValue).error, (curCell.value as CellErrorValue).error)
           case ValueType.Formula:
             return done(
               null,
-              '=' + this.normalizeCoords(curCell.formula, cell.sheet.index.base1)
+              '=' + this.normalizeCoords(curCell.formula, cell.sheet.index.base1),
+              curCell.result
             )
         }
       }

@@ -11,21 +11,23 @@ export default class Range implements Labelable {
     if (!this.start.sheet.equals(this.end.sheet)) throw new CrossSheetRangeError()
   }
 
-  toArray () {
+  toArray (): Reference[][] {
     const unitXVector = new Vector(1, 0)
     const unitYVector = new Vector(0, 1)
-    const ret = []
+    const table: Reference[][] = []
 
     let curRef = this.start
     for (;
       curRef.row.index.base0 <= this.end.row.index.base0;
       curRef = curRef.offset(unitYVector)
     ) {
+      const row: Reference[] = []
+
       for (;
         curRef.column.index.base0 <= this.end.column.index.base0;
         curRef = curRef.offset(unitXVector)
       ) {
-        ret.push(curRef)
+        row.push(curRef)
       }
 
       // because curRef.column.index.base0 > this.end.column.index.base0
@@ -34,9 +36,11 @@ export default class Range implements Labelable {
       curRef = curRef.offset(
         new Vector(-1 * (this.end.column.index.base0 - this.start.column.index.base0 + 1), 0)
       )
+
+      table.push(row)
     }
 
-    return ret
+    return table
   }
 
   get label () {

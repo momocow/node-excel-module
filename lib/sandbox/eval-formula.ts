@@ -6,7 +6,22 @@ const context: Record<string, any> = {}
  * Context always has the coordinates in absolute format.
  */
 export function evalFormula (entry: string, args: string[], ...evalArgs: any[]) {
+  const FormulaParser = require('hot-formula-parser').Parser
+  const parser = new FormulaParser()
+
   // /***** Common Methods *****/
+
+  function parse (expr: any) {
+    if (typeof expr === 'string' && expr.startsWith('=')) {
+      const { error, result } = parser.parse(expr.replace(/^=/, ''))
+      if (error) {
+        throw createError('FormulaError', error)
+      }
+      return result
+    } else {
+      return expr
+    }
+  }
 
   function createError (name: string, msg?: string): Error {
     const e = new Error(msg)
@@ -60,14 +75,16 @@ export function evalFormula (entry: string, args: string[], ...evalArgs: any[]) 
   }
 
   const errors: Error[] = []
-  const FormulaParser = require('hot-formula-parser').Parser
-  const parser = new FormulaParser()
 
-  parser.on('callCellValue', function ({ label, sheet }: FormulaParserReference, done: Function) {
+  parser.on('callCellValue', function (
+    { row: { label: rowLabel }, column: { label: colLabel }, sheet }: FormulaParserReference,
+    done: Function
+  ) {
     try {
-      done(parser.parse(`${localContext[`${sheet}!${label}`]}`.replace(/^=/, '')).result)
+      done(parse(localContext[`${sheet}!$${colLabel}$${rowLabel}`]))
     } catch (e) {
       errors.push(e)
+      throw e
     }
   })
 
@@ -78,10 +95,11 @@ export function evalFormula (entry: string, args: string[], ...evalArgs: any[]) 
   ) {
     try {
       done(parseRange(start, end).map(
-        (labels: string[]) => labels.map(label => parser.parse(`${localContext[label]}`.replace(/^=/, '')).result)
+        (labels: string[]) => labels.map(label => parse(localContext[label]))
       ))
     } catch (e) {
       errors.push(e)
+      throw e
     }
   })
 
@@ -89,12 +107,8 @@ export function evalFormula (entry: string, args: string[], ...evalArgs: any[]) 
     throw createError('EntryError', 'The entry cell is not defined.')
   }
 
-  const { error, result } = parser.parse(`${localContext[entry]}`.replace(/^=/, ''))
+  const result = parse(localContext[entry])
 
   if (errors.length > 0) throw errors[0]
-
-  if (error) {
-    throw createError('FormulaError', error)
-  }
   return result
 }
